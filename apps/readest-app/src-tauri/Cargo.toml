@@ -88,6 +88,8 @@ tauri-plugin-biometric = "2"
 tauri-plugin-persisted-scope = "2"
 tauri-plugin-native-bridge = { path = "./plugins/tauri-plugin-native-bridge" }
 tauri-plugin-native-tts = { path = "./plugins/tauri-plugin-native-tts" }
+# Acceso a las carpetas compartidas del NAS por SMB/CIFS (TrueNAS).
+tauri-plugin-nas-smb = { path = "./plugins/tauri-plugin-nas-smb" }
 tauri-plugin-webview-upgrade = { path = "./plugins/tauri-plugin-webview-upgrade" }
 tauri-plugin-websocket = "2"
 tauri-plugin-sharekit = "0.3"

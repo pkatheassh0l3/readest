@@ -211,6 +211,7 @@
     "turso:default",
     "native-tts:default",
     "native-bridge:default",
+    "nas-smb:default",
     "sentry:default",
     "allow-start-server",
     "allow-download-file",

@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Permite navegar por una carpeta compartida del NAS por SMB y traerse libros de ella."
+permissions = [
+    "allow-connect",
+    "allow-list",
+    "allow-download",
+    "allow-disconnect",
+]

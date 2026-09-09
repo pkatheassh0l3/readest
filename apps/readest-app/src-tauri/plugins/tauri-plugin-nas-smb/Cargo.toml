@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-nas-smb"
+version = "0.1.0"
+authors = ["NasConnect"]
+description = "Acceso a carpetas compartidas por SMB/CIFS (TrueNAS) desde Readest"
+edition = "2021"
+rust-version = "1.88"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+# `links` es obligatorio para los plugins de Tauri con parte móvil: por ahí pasa
+# tauri-plugin los metadatos del proyecto Android al generar gen/android.
+links = "tauri-plugin-nas-smb"
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
