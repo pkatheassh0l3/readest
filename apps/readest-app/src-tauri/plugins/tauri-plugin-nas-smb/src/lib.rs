@@ -5,13 +5,19 @@ use tauri::{
 
 pub use models::*;
 
-// SMB solo está implementado en Android (Kotlin + smbj). iOS y escritorio se
-// quedan con la implementación de `desktop`, que responde "no disponible":
-// así el plugin siempre arranca y no tumba la app en esas plataformas.
-#[cfg(any(desktop, target_os = "ios"))]
+// SMB está implementado en Android (Kotlin + smbj) y en Windows (std::fs sobre
+// rutas UNC, que es como Windows expone un recurso compartido). macOS, Linux e
+// iOS se quedan con la implementación de `desktop`, que responde "no
+// disponible": así el plugin siempre arranca y no tumba la app.
+#[cfg(all(any(desktop, target_os = "ios"), not(windows)))]
 mod desktop;
 #[cfg(target_os = "android")]
 mod mobile;
+// En Windows de verdad, y bajo `cargo test` en cualquier sistema: así la parte
+// que no es FFI (rutas, errores, base64) se comprueba también desde Linux.
+#[cfg(any(windows, test))]
+#[cfg_attr(not(windows), allow(dead_code))]
+mod windows_smb;
 
 mod commands;
 mod error;
@@ -19,10 +25,12 @@ mod models;
 
 pub use error::{Error, Result};
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(all(any(desktop, target_os = "ios"), not(windows)))]
 use desktop::NasSmb;
 #[cfg(target_os = "android")]
 use mobile::NasSmb;
+#[cfg(windows)]
+use windows_smb::NasSmb;
 
 /// Acceso al plugin desde [`tauri::App`], [`tauri::AppHandle`] o [`tauri::Window`].
 pub trait NasSmbExt<R: Runtime> {
@@ -58,7 +66,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, api| {
             #[cfg(target_os = "android")]
             let nas_smb = mobile::init(app, api)?;
-            #[cfg(any(desktop, target_os = "ios"))]
+            #[cfg(windows)]
+            let nas_smb = windows_smb::init(app, api)?;
+            #[cfg(all(any(desktop, target_os = "ios"), not(windows)))]
             let nas_smb = desktop::init(app, api)?;
             app.manage(nas_smb);
             Ok(())

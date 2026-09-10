@@ -4,7 +4,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("SMB solo está disponible en la app de Android")]
+    #[error("SMB solo está disponible en la app de Android y en Windows")]
     UnsupportedPlatformError,
     #[error("Error de SMB: {0}")]
     SmbError(String),
