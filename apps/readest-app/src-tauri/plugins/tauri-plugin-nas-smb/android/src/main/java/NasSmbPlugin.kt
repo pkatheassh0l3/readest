@@ -1,6 +1,8 @@
 package com.readest.nas_smb
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.util.Log
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -22,6 +24,7 @@ import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
 import org.json.JSONArray
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.ConnectException
 import java.net.NoRouteToHostException
@@ -52,6 +55,23 @@ class DownloadArgs {
     var dest: String = ""
 }
 
+@InvokeArg
+class UploadArgs {
+    var source: String = ""
+    var path: String = ""
+}
+
+@InvokeArg
+class MkdirArgs {
+    var path: String = ""
+}
+
+@InvokeArg
+class RemoveArgs {
+    var path: String = ""
+    var isDirectory: Boolean = false
+}
+
 /**
  * Acceso SMB/CIFS (TrueNAS) para Readest.
  *
@@ -70,6 +90,7 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
     companion object {
         private const val TAG = "NasSmbPlugin"
         private const val DEFAULT_PORT = 445
+        private const val TAILSCALE_PACKAGE = "com.tailscale.ipn"
     }
 
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "nas-smb") }
@@ -211,6 +232,123 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
                     JSObject().put("ok", false).put("bytes", 0.0).put("message", describeError(e))
                 )
             }
+        }
+    }
+
+    @Command
+    fun upload(invoke: Invoke) {
+        val args = invoke.parseArgs(UploadArgs::class.java)
+        io.execute {
+            val share = diskShare
+            if (share == null) {
+                invoke.reject("No hay conexión activa con el NAS")
+                return@execute
+            }
+            try {
+                val local = File(args.source)
+                if (!local.exists()) throw IllegalArgumentException("El archivo local no existe")
+
+                var total = 0L
+                // FILE_OVERWRITE_IF: si ya existe, lo reemplaza; si no, lo crea.
+                val remote = share.openFile(
+                    normalizePath(args.path),
+                    EnumSet.of(AccessMask.GENERIC_WRITE),
+                    EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+                    EnumSet.of(SMB2ShareAccess.FILE_SHARE_WRITE),
+                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                    EnumSet.noneOf(SMB2CreateOptions::class.java)
+                )
+                remote.use { f ->
+                    FileInputStream(local).use { input ->
+                        f.outputStream.use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read <= 0) break
+                                output.write(buffer, 0, read)
+                                total += read
+                            }
+                            output.flush()
+                        }
+                    }
+                }
+                invoke.resolve(JSObject().put("ok", true).put("bytes", total.toDouble()))
+            } catch (e: Exception) {
+                Log.w(TAG, "upload falló", e)
+                invoke.resolve(
+                    JSObject().put("ok", false).put("bytes", 0.0).put("message", describeError(e))
+                )
+            }
+        }
+    }
+
+    @Command
+    fun mkdir(invoke: Invoke) {
+        val args = invoke.parseArgs(MkdirArgs::class.java)
+        io.execute {
+            val share = diskShare
+            if (share == null) {
+                invoke.reject("No hay conexión activa con el NAS")
+                return@execute
+            }
+            try {
+                share.mkdir(normalizePath(args.path))
+                invoke.resolve(JSObject().put("ok", true))
+            } catch (e: Exception) {
+                Log.w(TAG, "mkdir falló", e)
+                invoke.resolve(JSObject().put("ok", false).put("message", describeError(e)))
+            }
+        }
+    }
+
+    @Command
+    fun remove(invoke: Invoke) {
+        val args = invoke.parseArgs(RemoveArgs::class.java)
+        io.execute {
+            val share = diskShare
+            if (share == null) {
+                invoke.reject("No hay conexión activa con el NAS")
+                return@execute
+            }
+            try {
+                val path = normalizePath(args.path)
+                if (args.isDirectory) share.rmdir(path, true) else share.rm(path)
+                invoke.resolve(JSObject().put("ok", true))
+            } catch (e: Exception) {
+                Log.w(TAG, "remove falló", e)
+                invoke.resolve(JSObject().put("ok", false).put("message", describeError(e)))
+            }
+        }
+    }
+
+    @Command
+    fun tailscale_status(invoke: Invoke) {
+        val installed = runCatching {
+            activity.packageManager.getLaunchIntentForPackage(TAILSCALE_PACKAGE) != null
+        }.getOrDefault(false)
+        invoke.resolve(JSObject().put("installed", installed))
+    }
+
+    @Command
+    fun open_tailscale(invoke: Invoke) {
+        val intent = runCatching {
+            activity.packageManager.getLaunchIntentForPackage(TAILSCALE_PACKAGE)
+        }.getOrNull()
+        if (intent == null) {
+            invoke.resolve(
+                JSObject().put("opened", false)
+                    .put("message", "No encuentro la app de Tailscale instalada en este dispositivo")
+            )
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            activity.startActivity(intent)
+            invoke.resolve(JSObject().put("opened", true))
+        } catch (e: ActivityNotFoundException) {
+            invoke.resolve(
+                JSObject().put("opened", false).put("message", "No se pudo abrir Tailscale")
+            )
         }
     }
 

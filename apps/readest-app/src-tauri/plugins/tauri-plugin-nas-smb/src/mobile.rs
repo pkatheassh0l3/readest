@@ -43,4 +43,32 @@ impl<R: Runtime> NasSmb<R> {
             .run_mobile_plugin("disconnect", ())
             .map_err(Into::into)
     }
+
+    pub fn upload(&self, payload: UploadArgs) -> crate::Result<UploadResponse> {
+        self.0
+            .run_mobile_plugin("upload", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn mkdir(&self, payload: MkdirArgs) -> crate::Result<SimpleResponse> {
+        self.0.run_mobile_plugin("mkdir", payload).map_err(Into::into)
+    }
+
+    pub fn remove(&self, payload: RemoveArgs) -> crate::Result<SimpleResponse> {
+        self.0
+            .run_mobile_plugin("remove", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn tailscale_status(&self) -> crate::Result<TailscaleStatus> {
+        self.0
+            .run_mobile_plugin("tailscale_status", ())
+            .map_err(Into::into)
+    }
+
+    pub fn open_tailscale(&self) -> crate::Result<OpenTailscaleResponse> {
+        self.0
+            .run_mobile_plugin("open_tailscale", ())
+            .map_err(Into::into)
+    }
 }

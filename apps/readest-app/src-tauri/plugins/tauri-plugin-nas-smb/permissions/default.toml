@@ -1,10 +1,15 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Permite navegar por una carpeta compartida del NAS por SMB y traerse libros de ella."
+description = "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale."
 permissions = [
     "allow-connect",
     "allow-list",
     "allow-download",
+    "allow-upload",
+    "allow-mkdir",
+    "allow-remove",
     "allow-disconnect",
+    "allow-tailscale-status",
+    "allow-open-tailscale",
 ]

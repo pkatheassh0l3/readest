@@ -62,3 +62,56 @@ pub struct DownloadResponse {
     pub bytes: f64,
     pub message: Option<String>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadArgs {
+    /// Archivo local que se sube.
+    pub source: String,
+    /// Ruta de destino dentro del recurso compartido.
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadResponse {
+    pub ok: bool,
+    pub bytes: f64,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MkdirArgs {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveArgs {
+    pub path: String,
+    pub is_directory: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimpleResponse {
+    pub ok: bool,
+    pub message: Option<String>,
+}
+
+/// Estado de la app de Tailscale en el dispositivo. `installed` es false también
+/// cuando no se puede consultar (en Android 11+ hace falta declararla en
+/// <queries> del manifiesto para poder verla; el plugin ya lo hace).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TailscaleStatus {
+    pub installed: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenTailscaleResponse {
+    pub opened: bool,
+    pub message: Option<String>,
+}

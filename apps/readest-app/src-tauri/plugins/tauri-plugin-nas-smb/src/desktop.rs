@@ -31,4 +31,24 @@ impl<R: Runtime> NasSmb<R> {
     pub fn disconnect(&self) -> crate::Result<()> {
         Err(crate::Error::UnsupportedPlatformError)
     }
+
+    pub fn upload(&self, _payload: UploadArgs) -> crate::Result<UploadResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn mkdir(&self, _payload: MkdirArgs) -> crate::Result<SimpleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn remove(&self, _payload: RemoveArgs) -> crate::Result<SimpleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn tailscale_status(&self) -> crate::Result<TailscaleStatus> {
+        Ok(TailscaleStatus { installed: false })
+    }
+
+    pub fn open_tailscale(&self) -> crate::Result<OpenTailscaleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
 }

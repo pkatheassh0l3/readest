@@ -29,3 +29,39 @@ pub(crate) async fn download<R: Runtime>(
 pub(crate) async fn disconnect<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     app.nas_smb().disconnect()
 }
+
+#[command]
+pub(crate) async fn upload<R: Runtime>(
+    app: AppHandle<R>,
+    payload: UploadArgs,
+) -> Result<UploadResponse> {
+    app.nas_smb().upload(payload)
+}
+
+#[command]
+pub(crate) async fn mkdir<R: Runtime>(
+    app: AppHandle<R>,
+    payload: MkdirArgs,
+) -> Result<SimpleResponse> {
+    app.nas_smb().mkdir(payload)
+}
+
+#[command]
+pub(crate) async fn remove<R: Runtime>(
+    app: AppHandle<R>,
+    payload: RemoveArgs,
+) -> Result<SimpleResponse> {
+    app.nas_smb().remove(payload)
+}
+
+#[command]
+pub(crate) async fn tailscale_status<R: Runtime>(app: AppHandle<R>) -> Result<TailscaleStatus> {
+    app.nas_smb().tailscale_status()
+}
+
+#[command]
+pub(crate) async fn open_tailscale<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<OpenTailscaleResponse> {
+    app.nas_smb().open_tailscale()
+}
