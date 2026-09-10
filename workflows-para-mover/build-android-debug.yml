@@ -1,0 +1,107 @@
+# Compila un APK de depuración de Readest para Android y lo sube como artefacto.
+#
+# Es la versión mínima del build oficial de Readest (.github/workflows/release.yml):
+# mismas herramientas y misma NDK, pero SIN firma de release, así no hacen falta
+# secretos (keystore, Supabase, Sentry...). Un APK de depuración se instala igual
+# en el móvil o la tablet.
+#
+# Sobre el tamaño: un APK de depuración lleva la tabla de símbolos completa
+# dentro de libreadest.so, lo que lo hincha de decenas de MB a varios cientos, y
+# compilar las cuatro arquitecturas multiplica eso por cuatro. Aquí se compilan
+# solo las dos que se usan (arm64 para la tablet, x86_64 para los emuladores) y
+# se le pide a cargo que quite los símbolos, lo que baja el resultado de ~2 GB a
+# unas decenas de MB sin perder nada útil.
+#
+# Se lanza a mano desde la pestaña Actions, o en cada push a main.
+name: APK Android (debug)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    # El build de Android de Readest tarda ~50 min con la caché fría.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # foliate-js (el motor del lector) y tauri son submódulos: sin esto no compila.
+      - name: inicializar submódulos
+        run: git submodule update --init --recursive
+
+      - name: preparar pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: preparar node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: preparar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: preparar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: instalar NDK
+        run: sdkmanager "ndk;28.2.13676358"
+
+      - name: instalar dependencias
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: copiar vendors (pdfjs, simplecc) a public
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: instalar Rust con los objetivos de Android
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      # Sin esta caché, cada compilación de Rust empieza de cero (~40 min).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/readest-app/src-tauri -> target
+          key: android-debug
+
+      # Readest lee estas variables al construir el frontend. Sin cuenta en la
+      # nube no hacen falta valores reales: solo que existan.
+      - name: crear .env.local
+        run: |
+          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> .env.local
+          cp .env.local apps/readest-app/.env.local
+
+      - name: compilar APK de depuración
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          # Lo que hace pequeño el APK. Se pone por variable de entorno y no
+          # tocando el Cargo.toml para no cambiarle el perfil `dev` a quien
+          # compile en su equipo, donde los símbolos sí sirven para depurar.
+          CARGO_PROFILE_DEV_STRIP: debuginfo
+          CARGO_PROFILE_DEV_OPT_LEVEL: '1'
+        run: |
+          cd apps/readest-app/
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init
+          pnpm tauri icon ../../data/icons/readest-book.png
+          # `android init` e `icon` tocan archivos versionados; los restauramos
+          # igual que hace el build oficial de Readest.
+          git checkout .
+          # Solo las arquitecturas reales: arm64 para tablets y móviles,
+          # x86_64 para los emuladores del PC.
+          pnpm tauri android build --debug --target aarch64 --target x86_64
+
+      - name: subir el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: readest-nas-debug-apk
+          # Un APK por arquitectura; instala el arm64 en la tablet.
+          path: apps/readest-app/src-tauri/gen/android/app/build/outputs/apk/**/debug/*.apk
+          if-no-files-found: error

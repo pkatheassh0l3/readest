@@ -1,0 +1,84 @@
+# Compila Readest para Windows (instalador .msi y .exe) y los sube como artefactos.
+#
+# Es la versión mínima del build oficial de Readest (.github/workflows/release.yml):
+# mismas herramientas, pero SIN firma de código ni artefactos de actualización, así
+# no hacen falta secretos (certificado, Supabase, Sentry...). El instalador que sale
+# es válido; Windows solo avisará de que el editor no está verificado.
+#
+# El acceso al NAS en Windows no usa smbj: allí un recurso compartido es una ruta
+# (\\host\share), así que el plugin trabaja con std::fs y solo pide a mpr.dll que
+# abra la sesión con las credenciales. Ver src-tauri/plugins/tauri-plugin-nas-smb/
+# src/windows_smb.rs.
+#
+# Se lanza a mano desde la pestaña Actions, o en cada push a main.
+name: Windows (instalador)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    # Con la caché fría, compilar Rust para Windows ronda los 40 min.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # foliate-js (el motor del lector) y tauri son submódulos: sin esto no compila.
+      - name: inicializar submódulos
+        run: git submodule update --init --recursive
+
+      - name: preparar pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: preparar node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: instalar dependencias
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: copiar vendors (pdfjs, simplecc) a public
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Sin esta caché, cada compilación de Rust empieza de cero.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/readest-app/src-tauri -> target
+          key: windows-release
+
+      # Readest lee estas variables al construir el frontend. Sin cuenta en la
+      # nube no hacen falta valores reales: solo que existan.
+      - name: crear .env.local
+        shell: bash
+        run: |
+          echo "NEXT_PUBLIC_APP_PLATFORM=tauri" >> .env.local
+          cp .env.local apps/readest-app/.env.local
+
+      - name: comprobar el plugin del NAS en Windows
+        working-directory: apps/readest-app/src-tauri/plugins/tauri-plugin-nas-smb
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: compilar el instalador
+        working-directory: apps/readest-app
+        run: pnpm tauri build
+
+      - name: subir los instaladores
+        uses: actions/upload-artifact@v4
+        with:
+          name: readest-nas-windows
+          path: |
+            apps/readest-app/src-tauri/target/release/bundle/msi/*.msi
+            apps/readest-app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error

@@ -953,7 +953,11 @@ export const SHARE_TOKEN_LENGTH = 22;
 export const SHARE_PRESIGN_TTL_SECONDS = 300;
 export const SHARE_CFI_MAX_LENGTH = 512;
 
-const LATEST_DOWNLOAD_BASE_URL = 'https://download.readest.com/releases';
+// Las descargas y el aviso de "hay versión nueva" apuntan a ESTE fork, no al
+// Readest oficial. Con la URL original, la app ofrecía instalar el Readest de
+// verdad encima de esta, que se llevaría por delante el explorador del NAS.
+const LATEST_DOWNLOAD_BASE_URL =
+  'https://github.com/pkatheassh0l3/readest/releases/latest/download';
 
 export const READEST_UPDATER_FILE = `${LATEST_DOWNLOAD_BASE_URL}/latest.json`;
 
