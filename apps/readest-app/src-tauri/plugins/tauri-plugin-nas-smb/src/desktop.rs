@@ -51,4 +51,8 @@ impl<R: Runtime> NasSmb<R> {
     pub fn open_tailscale(&self) -> crate::Result<OpenTailscaleResponse> {
         Err(crate::Error::UnsupportedPlatformError)
     }
+
+    pub fn uri_display_name(&self, _payload: UriArgs) -> crate::Result<UriNameResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
 }

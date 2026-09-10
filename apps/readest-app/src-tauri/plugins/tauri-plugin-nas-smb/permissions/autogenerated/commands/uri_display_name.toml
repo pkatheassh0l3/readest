@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uri-display-name"
+description = "Enables the uri_display_name command without any pre-configured scope."
+commands.allow = ["uri_display_name"]
+
+[[permission]]
+identifier = "deny-uri-display-name"
+description = "Denies the uri_display_name command without any pre-configured scope."
+commands.deny = ["uri_display_name"]

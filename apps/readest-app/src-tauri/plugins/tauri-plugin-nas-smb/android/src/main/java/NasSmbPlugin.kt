@@ -3,6 +3,8 @@ package com.readest.nas_smb
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -64,6 +66,11 @@ class UploadArgs {
 @InvokeArg
 class MkdirArgs {
     var path: String = ""
+}
+
+@InvokeArg
+class UriArgs {
+    var uri: String = ""
 }
 
 @InvokeArg
@@ -254,7 +261,7 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
                     normalizePath(args.path),
                     EnumSet.of(AccessMask.GENERIC_WRITE),
                     EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
-                    EnumSet.of(SMB2ShareAccess.FILE_SHARE_WRITE),
+                    SMB2ShareAccess.ALL,
                     SMB2CreateDisposition.FILE_OVERWRITE_IF,
                     EnumSet.noneOf(SMB2CreateOptions::class.java)
                 )
@@ -350,6 +357,37 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
                 JSObject().put("opened", false).put("message", "No se pudo abrir Tailscale")
             )
         }
+    }
+
+    /**
+     * Nombre real del archivo detrás de un content:// del selector de Android.
+     *
+     * Hace falta porque esas URIs son opacas (algo como `msf%3A1000000033`):
+     * si el nombre se sacara de la URI, los archivos llegarían al NAS con un
+     * nombre ilegible y, peor, sin extensión.
+     */
+    @Command
+    fun uri_display_name(invoke: Invoke) {
+        val args = invoke.parseArgs(UriArgs::class.java)
+        io.execute {
+            val name = runCatching { resolveDisplayName(args.uri) }.getOrNull()
+            invoke.resolve(JSObject().put("name", name ?: ""))
+        }
+    }
+
+    private fun resolveDisplayName(uriString: String): String? {
+        if (uriString.isBlank()) return null
+        val uri = Uri.parse(uriString)
+        if (uri.scheme != "content") return uri.lastPathSegment
+        activity.contentResolver
+            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) return cursor.getString(idx)
+                }
+            }
+        return null
     }
 
     @Command

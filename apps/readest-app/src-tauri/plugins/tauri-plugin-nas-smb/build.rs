@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "disconnect",
     "tailscale_status",
     "open_tailscale",
+    "uri_display_name",
 ];
 
 fn main() {

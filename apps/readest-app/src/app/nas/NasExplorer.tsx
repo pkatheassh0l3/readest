@@ -16,9 +16,11 @@ import {
 } from 'react-icons/md';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
+import { useLibrary } from '@/hooks/useLibrary';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useDeviceControlStore } from '@/store/deviceStore';
 import { isTauriAppPlatform } from '@/services/environment';
 import { eventDispatcher } from '@/utils/event';
 import { copyURIToPath } from '@/utils/bridge';
@@ -26,6 +28,7 @@ import { ingestFile } from '@/services/ingestService';
 import { navigateToLibrary, navigateToReader } from '@/utils/nav';
 import { isSupportedBookExt } from '@/components/settings/integrations/webdavBrowseUtils';
 import {
+  looksDisconnected,
   looksUnreachable,
   openTailscale,
   smbConnect,
@@ -34,6 +37,7 @@ import {
   smbMkdir,
   smbRemove,
   smbUpload,
+  uriDisplayName,
   type NasCredentials,
   type SmbEntry,
 } from '@/services/nas/smbClient';
@@ -85,22 +89,22 @@ const parentPath = (path: string): string =>
 const NasExplorer: React.FC = () => {
   const _ = useTranslation();
   const router = useRouter();
-  const { envConfig } = useEnv();
+  const { envConfig, appService } = useEnv();
   const { user } = useAuth();
-  const { setSettings } = useSettingsStore();
-
   /**
-   * Arranque de la app.
+   * Arranque de la app: su propio hook carga ajustes y biblioteca en los stores
+   * y avisa cuando está listo.
    *
-   * Esto lo hacía la pantalla de la biblioteca, que era la de inicio. Al poner
-   * el explorador del NAS de entrada dejó de ocurrir, y el lector se quedaba en
-   * blanco para siempre: `Reader.tsx` solo se dibuja si
-   * `libraryLoaded && settings.globalReadSettings`, y sin este arranque ninguna
-   * de las dos cosas existe. Así que replicamos lo mismo que hace su
-   * `initLibrary` en app/library/page.tsx.
+   * Es imprescindible, y de forma poco evidente. `Reader.tsx` solo se dibuja si
+   * `libraryLoaded && settings.globalReadSettings`; si no, pinta un div vacío
+   * (la pantalla en blanco). `useLibrary` se encarga de ambas cosas... pero se
+   * salta TODA la inicialización si la biblioteca ya está marcada como cargada.
+   * Por eso hay que usar este hook y no un `setLibrary` por nuestra cuenta: eso
+   * marcaría la biblioteca como cargada sin haber cargado los ajustes, y el
+   * lector se quedaría en blanco para siempre.
    */
-  const [appReady, setAppReady] = useState(false);
-  const initStarted = useRef(false);
+  const { libraryLoaded: appReady } = useLibrary();
+  const { acquireBackKeyInterception, releaseBackKeyInterception } = useDeviceControlStore();
 
   const [profiles, setProfiles] = useState<NasProfile[]>([]);
   const [form, setForm] = useState<NasCredentials>(EMPTY_FORM);
@@ -112,6 +116,13 @@ const NasExplorer: React.FC = () => {
   const [suggestTailscale, setSuggestTailscale] = useState(false);
   /** true mientras es el intento automático al abrir la app (no mostramos el error como si lo hubiera pedido ella). */
   const [autoConnecting, setAutoConnecting] = useState(false);
+
+  /**
+   * Nombre de la carpeta nueva. Va en un campo dentro de la propia pantalla
+   * porque `window.prompt` NO funciona en el WebView de la app (igual que
+   * `window.confirm`, según advierte su propio código en WebDAVBrowsePane).
+   */
+  const [newFolderName, setNewFolderName] = useState<string | null>(null);
 
   const [path, setPath] = useState('');
   const [entries, setEntries] = useState<SmbEntry[]>([]);
@@ -134,6 +145,17 @@ const NasExplorer: React.FC = () => {
       setPath(target);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      // Con el móvil, la sesión SMB se cae sola: basta con dejar la app en
+      // segundo plano un rato o que se apague Tailscale. Reintentar el listado
+      // no arregla nada, así que volvemos a la pantalla de conexión (que
+      // reintenta con el mismo perfil) en vez de dejar un aviso y un explorador
+      // que ya no responde.
+      if (looksDisconnected(message)) {
+        setStatus('failed');
+        setErrorMessage(message);
+        setSuggestTailscale(looksUnreachable(message));
+        setEntries([]);
+      }
       eventDispatcher.dispatch('toast', { type: 'error', message });
     } finally {
       setListing(false);
@@ -177,30 +199,11 @@ const NasExplorer: React.FC = () => {
     [loadFolder],
   );
 
-  // Al abrir la app: inicializar ajustes y biblioteca, cargar perfiles y
-  // conectar solo al último usado.
+  // Al abrir la app: perfiles guardados y conexión al último usado.
   useEffect(() => {
-    if (initStarted.current) return;
-    initStarted.current = true;
     let cancelled = false;
 
     (async () => {
-      // 1) Ajustes y biblioteca en sus stores. Sin esto el lector nunca dibuja.
-      try {
-        const appService = await envConfig.getAppService();
-        if (appService) {
-          const loaded = await appService.loadSettings();
-          if (!cancelled) setSettings(loaded);
-          const books = await appService.loadLibraryBooks();
-          if (!cancelled) useLibraryStore.getState().setLibrary(books);
-        }
-      } catch (e) {
-        console.error('No se pudo inicializar la app antes del explorador', e);
-      }
-      if (cancelled) return;
-      setAppReady(true);
-
-      // 2) Perfiles guardados y autoconexión al último usado.
       const saved = await loadProfiles();
       if (cancelled) return;
       setProfiles(saved);
@@ -228,16 +231,74 @@ const NasExplorer: React.FC = () => {
    * evento de visibilidad y reintentamos en ese momento.
    */
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible') return;
+    const retryIfPending = () => {
       if (!pendingTailscaleRetry.current) return;
       pendingTailscaleRetry.current = false;
       const credentials = lastAttempt.current;
       if (credentials) void connect(credentials, { remember: false });
     };
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      retryIfPending();
+    };
+    // Se escuchan los dos eventos, como hace su `useReplicaPull`: al volver al
+    // primer plano no siempre llega `visibilitychange`, y cuando llega puede
+    // hacerlo bastante después de `focus`.
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', retryIfPending);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', retryIfPending);
+    };
   }, [connect]);
+
+  /**
+   * Botón "atrás" de Android.
+   *
+   * Sin esto, atrás cierra la app. Lo que ella pidió es que suba una carpeta,
+   * como en cualquier explorador. Se usa el mismo mecanismo que su
+   * `useKeyDownActions`: se pide la intercepción (contada por referencias, se
+   * suelta al desmontar) y se escucha `native-key-down` de forma síncrona, que
+   * es la única manera de consumir la tecla antes de que Android cierre.
+   *
+   * Devolver `true` = consumida; `false` = que siga su curso (y en la raíz,
+   * salir de la app, que es lo esperable).
+   */
+  const backKeyState = useRef({ path, status, newFolderName });
+  backKeyState.current = { path, status, newFolderName };
+
+  useEffect(() => {
+    if (!appService?.isAndroidApp) return;
+
+    const handleBackKey = (event: CustomEvent) => {
+      if (event.detail?.keyName !== 'Back') return false;
+      const {
+        path: currentPath,
+        status: currentStatus,
+        newFolderName: pendingName,
+      } = backKeyState.current;
+      // Primero se cierra el campo de "carpeta nueva" si está abierto.
+      if (pendingName !== null) {
+        setNewFolderName(null);
+        return true;
+      }
+      if (currentStatus === 'connected' && currentPath) {
+        void loadFolder(parentPath(currentPath));
+        return true;
+      }
+      return false;
+    };
+
+    acquireBackKeyInterception?.();
+    eventDispatcher.onSync('native-key-down', handleBackKey);
+    return () => {
+      releaseBackKeyInterception?.();
+      eventDispatcher.offSync('native-key-down', handleBackKey);
+    };
+    // El manejador lee el estado por referencia, así que no hace falta volver a
+    // registrarlo (ni soltar y pedir la intercepción) en cada navegación.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appService?.isAndroidApp]);
 
   const handleOpenTailscale = async () => {
     const res = await openTailscale();
@@ -300,6 +361,13 @@ const NasExplorer: React.FC = () => {
       navigateToReader(router, [imported.hash]);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      // Igual que al listar: si la sesión SMB ya no vale, volvemos a la
+      // pantalla de conexión en vez de dejar un aviso sin salida.
+      if (looksDisconnected(message)) {
+        setStatus('failed');
+        setErrorMessage(message);
+        setSuggestTailscale(looksUnreachable(message));
+      }
       eventDispatcher.dispatch('toast', { type: 'error', message });
     } finally {
       setBusyPath(null);
@@ -332,10 +400,19 @@ const NasExplorer: React.FC = () => {
 
       for (const item of picked) {
         const uri = typeof item === 'string' ? item : String(item);
-        const name = uri.split(/[/\\]/).pop() || `subida-${Date.now()}`;
-        // En Android el selector devuelve URIs content://, que el lado nativo
-        // de SMB no puede abrir como archivo: las pasamos primero a caché con
-        // el ayudante que ya trae Readest.
+        // En Android el selector devuelve URIs content:// opacas: su último
+        // segmento es algo como `msf%3A1000000033`, no un nombre de archivo.
+        // Hay que preguntarle al sistema el nombre real, o el archivo llegaría
+        // al NAS con ese churro y encima sin extensión.
+        let name = '';
+        if (uri.startsWith('content://')) {
+          name = await uriDisplayName(uri).catch(() => '');
+        }
+        if (!name) name = uri.split(/[/\\]/).pop() || '';
+        name = name.replaceAll(/[/\\:*?"<>|]/g, '_').trim() || `subida-${Date.now()}`;
+
+        // El lado nativo de SMB abre archivos, no URIs: las content:// se pasan
+        // antes a caché con el ayudante que ya trae Readest.
         let localPath = uri;
         if (uri.startsWith('content://')) {
           const dst = await appService.resolveFilePath(`upload-${Date.now()}-${name}`, 'Cache');
@@ -357,9 +434,9 @@ const NasExplorer: React.FC = () => {
   };
 
   const handleCreateFolder = async () => {
-    const name = window.prompt('Nombre de la nueva carpeta');
-    if (!name?.trim()) return;
-    const target = path ? `${path}/${name.trim()}` : name.trim();
+    const name = (newFolderName ?? '').trim();
+    if (!name) return;
+    const target = path ? `${path}/${name}` : name;
     const res = await smbMkdir(target);
     if (!res.ok) {
       eventDispatcher.dispatch('toast', {
@@ -368,11 +445,17 @@ const NasExplorer: React.FC = () => {
       });
       return;
     }
+    setNewFolderName(null);
     await loadFolder(path);
   };
 
   const handleDelete = async (entry: SmbEntry) => {
-    const ok = window.confirm(`¿Borrar "${entry.name}" del NAS?`);
+    const appService = await envConfig.getAppService();
+    if (!appService) return;
+    // appService.ask, NO window.confirm: en el WebView de la app el segundo no
+    // hace nada (lo advierte su propio WebDAVBrowsePane), así que el borrado se
+    // ejecutaría sin que llegaras a ver la pregunta.
+    const ok = await appService.ask(`¿Borrar "${entry.name}" del NAS?`);
     if (!ok) return;
     const res = await smbRemove(entry.path, entry.isDirectory);
     if (!res.ok) {
@@ -382,6 +465,7 @@ const NasExplorer: React.FC = () => {
       });
       return;
     }
+    setNewFolderName(null);
     await loadFolder(path);
   };
 
@@ -540,7 +624,7 @@ const NasExplorer: React.FC = () => {
         <button
           className='btn btn-ghost btn-sm'
           aria-label={_('Nueva carpeta')}
-          onClick={() => void handleCreateFolder()}
+          onClick={() => setNewFolderName((v) => (v === null ? '' : null))}
         >
           <MdCreateNewFolder />
         </button>
@@ -559,6 +643,32 @@ const NasExplorer: React.FC = () => {
           <MdMenuBook />
         </button>
       </div>
+
+      {newFolderName !== null && (
+        <div className='border-base-300 flex items-center gap-2 border-b p-2'>
+          <input
+            className='input input-bordered input-sm eink-bordered flex-1'
+            autoFocus
+            placeholder={_('Nombre de la nueva carpeta')}
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleCreateFolder();
+              if (e.key === 'Escape') setNewFolderName(null);
+            }}
+          />
+          <button
+            className='btn btn-sm btn-contrast'
+            disabled={!newFolderName.trim()}
+            onClick={() => void handleCreateFolder()}
+          >
+            {_('Crear')}
+          </button>
+          <button className='btn btn-sm btn-ghost' onClick={() => setNewFolderName(null)}>
+            {_('Cancelar')}
+          </button>
+        </div>
+      )}
 
       {listing && (
         <div className='flex items-center gap-2 p-3 text-sm opacity-70'>

@@ -95,3 +95,32 @@ export const looksUnreachable = (message?: string): boolean => {
     m.includes('rechazada')
   );
 };
+
+/**
+ * Nombre real del archivo detrás de un `content://` del selector de Android.
+ * Devuelve cadena vacía si no se puede averiguar.
+ */
+export const uriDisplayName = async (uri: string): Promise<string> => {
+  const res = await invoke<{ name: string }>('plugin:nas-smb|uri_display_name', {
+    payload: { uri },
+  });
+  return res.name ?? '';
+};
+
+/**
+ * true cuando el fallo indica que la sesión SMB ya no sirve (se cayó la red,
+ * el móvil estuvo en segundo plano, se apagó Tailscale...). En ese caso hay
+ * que volver a conectar: reintentar la operación sin más no arregla nada.
+ */
+export const looksDisconnected = (message?: string): boolean => {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes('no hay conexión activa') ||
+    m.includes('socket') ||
+    m.includes('closed') ||
+    m.includes('broken') ||
+    m.includes('reset') ||
+    looksUnreachable(message)
+  );
+};

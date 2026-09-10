@@ -12,4 +12,5 @@ permissions = [
     "allow-disconnect",
     "allow-tailscale-status",
     "allow-open-tailscale",
+    "allow-uri-display-name",
 ]

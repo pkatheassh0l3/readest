@@ -29,7 +29,9 @@ impl<R: Runtime> NasSmb<R> {
     }
 
     pub fn list(&self, payload: ListArgs) -> crate::Result<ListResponse> {
-        self.0.run_mobile_plugin("list", payload).map_err(Into::into)
+        self.0
+            .run_mobile_plugin("list", payload)
+            .map_err(Into::into)
     }
 
     pub fn download(&self, payload: DownloadArgs) -> crate::Result<DownloadResponse> {
@@ -51,7 +53,9 @@ impl<R: Runtime> NasSmb<R> {
     }
 
     pub fn mkdir(&self, payload: MkdirArgs) -> crate::Result<SimpleResponse> {
-        self.0.run_mobile_plugin("mkdir", payload).map_err(Into::into)
+        self.0
+            .run_mobile_plugin("mkdir", payload)
+            .map_err(Into::into)
     }
 
     pub fn remove(&self, payload: RemoveArgs) -> crate::Result<SimpleResponse> {
@@ -69,6 +73,12 @@ impl<R: Runtime> NasSmb<R> {
     pub fn open_tailscale(&self) -> crate::Result<OpenTailscaleResponse> {
         self.0
             .run_mobile_plugin("open_tailscale", ())
+            .map_err(Into::into)
+    }
+
+    pub fn uri_display_name(&self, payload: UriArgs) -> crate::Result<UriNameResponse> {
+        self.0
+            .run_mobile_plugin("uri_display_name", payload)
             .map_err(Into::into)
     }
 }

@@ -115,3 +115,19 @@ pub struct OpenTailscaleResponse {
     pub opened: bool,
     pub message: Option<String>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UriArgs {
+    pub uri: String,
+}
+
+/// Nombre real ("display name") de un content:// del selector de Android.
+/// Sin esto, el nombre habría que sacarlo de la propia URI, que en Android es
+/// opaca (algo como `msf%3A1000000033`): los archivos acabarían en el NAS con
+/// un nombre ilegible y sin extensión.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UriNameResponse {
+    pub name: String,
+}

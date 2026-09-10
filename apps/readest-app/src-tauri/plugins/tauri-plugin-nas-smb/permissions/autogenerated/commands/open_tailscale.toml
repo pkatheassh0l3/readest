@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-open-tailscale"
+description = "Enables the open_tailscale command without any pre-configured scope."
+commands.allow = ["open_tailscale"]
+
+[[permission]]
+identifier = "deny-open-tailscale"
+description = "Denies the open_tailscale command without any pre-configured scope."
+commands.deny = ["open_tailscale"]

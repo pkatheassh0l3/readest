@@ -343,10 +343,82 @@
           "markdownDescription": "Denies the list command without any pre-configured scope."
         },
         {
-          "description": "Permite navegar por una carpeta compartida del NAS por SMB y traerse libros de ella.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-disconnect`",
+          "description": "Enables the mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mkdir",
+          "markdownDescription": "Enables the mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mkdir",
+          "markdownDescription": "Denies the mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_tailscale command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-tailscale",
+          "markdownDescription": "Enables the open_tailscale command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_tailscale command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-tailscale",
+          "markdownDescription": "Denies the open_tailscale command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-remove",
+          "markdownDescription": "Enables the remove command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-remove",
+          "markdownDescription": "Denies the remove command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the tailscale_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tailscale-status",
+          "markdownDescription": "Enables the tailscale_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tailscale_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tailscale-status",
+          "markdownDescription": "Denies the tailscale_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the upload command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-upload",
+          "markdownDescription": "Enables the upload command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the upload command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-upload",
+          "markdownDescription": "Denies the upload command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uri_display_name command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uri-display-name",
+          "markdownDescription": "Enables the uri_display_name command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uri_display_name command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uri-display-name",
+          "markdownDescription": "Denies the uri_display_name command without any pre-configured scope."
+        },
+        {
+          "description": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Permite navegar por una carpeta compartida del NAS por SMB y traerse libros de ella.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-disconnect`"
+          "markdownDescription": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`"
         }
       ]
     }

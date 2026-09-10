@@ -60,8 +60,14 @@ pub(crate) async fn tailscale_status<R: Runtime>(app: AppHandle<R>) -> Result<Ta
 }
 
 #[command]
-pub(crate) async fn open_tailscale<R: Runtime>(
-    app: AppHandle<R>,
-) -> Result<OpenTailscaleResponse> {
+pub(crate) async fn open_tailscale<R: Runtime>(app: AppHandle<R>) -> Result<OpenTailscaleResponse> {
     app.nas_smb().open_tailscale()
+}
+
+#[command]
+pub(crate) async fn uri_display_name<R: Runtime>(
+    app: AppHandle<R>,
+    payload: UriArgs,
+) -> Result<UriNameResponse> {
+    app.nas_smb().uri_display_name(payload)
 }
