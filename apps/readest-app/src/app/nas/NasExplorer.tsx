@@ -87,7 +87,20 @@ const NasExplorer: React.FC = () => {
   const router = useRouter();
   const { envConfig } = useEnv();
   const { user } = useAuth();
-  const { settings: globalSettings } = useSettingsStore();
+  const { setSettings } = useSettingsStore();
+
+  /**
+   * Arranque de la app.
+   *
+   * Esto lo hacía la pantalla de la biblioteca, que era la de inicio. Al poner
+   * el explorador del NAS de entrada dejó de ocurrir, y el lector se quedaba en
+   * blanco para siempre: `Reader.tsx` solo se dibuja si
+   * `libraryLoaded && settings.globalReadSettings`, y sin este arranque ninguna
+   * de las dos cosas existe. Así que replicamos lo mismo que hace su
+   * `initLibrary` en app/library/page.tsx.
+   */
+  const [appReady, setAppReady] = useState(false);
+  const initStarted = useRef(false);
 
   const [profiles, setProfiles] = useState<NasProfile[]>([]);
   const [form, setForm] = useState<NasCredentials>(EMPTY_FORM);
@@ -164,10 +177,30 @@ const NasExplorer: React.FC = () => {
     [loadFolder],
   );
 
-  // Al abrir la app: cargar perfiles y conectar solo al último usado.
+  // Al abrir la app: inicializar ajustes y biblioteca, cargar perfiles y
+  // conectar solo al último usado.
   useEffect(() => {
+    if (initStarted.current) return;
+    initStarted.current = true;
     let cancelled = false;
+
     (async () => {
+      // 1) Ajustes y biblioteca en sus stores. Sin esto el lector nunca dibuja.
+      try {
+        const appService = await envConfig.getAppService();
+        if (appService) {
+          const loaded = await appService.loadSettings();
+          if (!cancelled) setSettings(loaded);
+          const books = await appService.loadLibraryBooks();
+          if (!cancelled) useLibraryStore.getState().setLibrary(books);
+        }
+      } catch (e) {
+        console.error('No se pudo inicializar la app antes del explorador', e);
+      }
+      if (cancelled) return;
+      setAppReady(true);
+
+      // 2) Perfiles guardados y autoconexión al último usado.
       const saved = await loadProfiles();
       if (cancelled) return;
       setProfiles(saved);
@@ -178,6 +211,7 @@ const NasExplorer: React.FC = () => {
         await connect(last, { remember: false, auto: true });
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -226,6 +260,15 @@ const NasExplorer: React.FC = () => {
     if (!isTauriAppPlatform()) return;
     const appService = await envConfig.getAppService();
     if (!appService) return;
+    if (!appReady) {
+      // Abrir el lector antes de que los ajustes estén en su store da pantalla
+      // en blanco, así que preferimos avisar y que lo intente otra vez.
+      eventDispatcher.dispatch('toast', {
+        type: 'info',
+        message: 'La app aún está arrancando; inténtalo de nuevo en un segundo.',
+      });
+      return;
+    }
 
     setBusyPath(entry.path);
     try {
@@ -236,9 +279,12 @@ const NasExplorer: React.FC = () => {
 
       const { library: storeLibrary, libraryLoaded, setLibrary } = useLibraryStore.getState();
       const library = libraryLoaded ? [...storeLibrary] : await appService.loadLibraryBooks();
+      // Los ajustes se leen del store en este momento (no de una copia
+      // capturada al renderizar), para que sean los ya cargados del disco.
+      const currentSettings = useSettingsStore.getState().settings;
       const imported = await ingestFile(
         { file: dst, books: library },
-        { appService, settings: globalSettings, isLoggedIn: !!user },
+        { appService, settings: currentSettings, isLoggedIn: !!user },
       );
       // ingestFile ya ha copiado los bytes a Books/<hash>/: la copia en caché
       // sobra. Si el borrado falla no pasa nada, lo limpia el sistema.
@@ -294,7 +340,8 @@ const NasExplorer: React.FC = () => {
         if (uri.startsWith('content://')) {
           const dst = await appService.resolveFilePath(`upload-${Date.now()}-${name}`, 'Cache');
           const copied = await copyURIToPath({ uri, dst });
-          if (!copied.success) throw new Error(copied.error ?? 'No se pudo leer el archivo elegido');
+          if (!copied.success)
+            throw new Error(copied.error ?? 'No se pudo leer el archivo elegido');
           localPath = dst;
         }
         const remote = path ? `${path}/${name}` : name;
@@ -456,9 +503,7 @@ const NasExplorer: React.FC = () => {
 
         {suggestTailscale && (
           <div className='flex flex-col gap-2 rounded-lg border border-base-300 p-3 text-sm'>
-            <span>
-              {_('No llego al NAS. Si estás fuera de casa, necesitas Tailscale activo.')}
-            </span>
+            <span>{_('No llego al NAS. Si estás fuera de casa, necesitas Tailscale activo.')}</span>
             <button className='btn btn-sm' onClick={() => void handleOpenTailscale()}>
               {_('Abrir Tailscale')}
             </button>
@@ -541,7 +586,13 @@ const NasExplorer: React.FC = () => {
                     entry.isDirectory ? 'text-primary' : isBook ? 'text-secondary' : 'opacity-50',
                   )}
                 >
-                  {entry.isDirectory ? <MdFolder /> : isBook ? <MdMenuBook /> : <MdInsertDriveFile />}
+                  {entry.isDirectory ? (
+                    <MdFolder />
+                  ) : isBook ? (
+                    <MdMenuBook />
+                  ) : (
+                    <MdInsertDriveFile />
+                  )}
                 </span>
                 <span className='min-w-0 flex-1'>
                   <span className='block truncate text-sm'>{entry.name}</span>
