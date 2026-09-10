@@ -71,3 +71,51 @@ pub(crate) async fn uri_display_name<R: Runtime>(
 ) -> Result<UriNameResponse> {
     app.nas_smb().uri_display_name(payload)
 }
+
+#[command]
+pub(crate) async fn sync_read<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncReadArgs,
+) -> Result<SyncReadResponse> {
+    app.nas_smb().sync_read(payload)
+}
+
+#[command]
+pub(crate) async fn sync_write<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncWriteArgs,
+) -> Result<SyncSimpleResponse> {
+    app.nas_smb().sync_write(payload)
+}
+
+#[command]
+pub(crate) async fn sync_stat<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncPathArgs,
+) -> Result<SyncStatResponse> {
+    app.nas_smb().sync_stat(payload)
+}
+
+#[command]
+pub(crate) async fn sync_list<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncPathArgs,
+) -> Result<SyncListResponse> {
+    app.nas_smb().sync_list(payload)
+}
+
+#[command]
+pub(crate) async fn sync_mkdir<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncPathArgs,
+) -> Result<SyncSimpleResponse> {
+    app.nas_smb().sync_mkdir(payload)
+}
+
+#[command]
+pub(crate) async fn sync_remove_dir<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SyncPathArgs,
+) -> Result<SyncSimpleResponse> {
+    app.nas_smb().sync_remove_dir(payload)
+}

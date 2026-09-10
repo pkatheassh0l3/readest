@@ -379,6 +379,78 @@
           "markdownDescription": "Denies the remove command without any pre-configured scope."
         },
         {
+          "description": "Enables the sync_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-list",
+          "markdownDescription": "Enables the sync_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-list",
+          "markdownDescription": "Denies the sync_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-mkdir",
+          "markdownDescription": "Enables the sync_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-mkdir",
+          "markdownDescription": "Denies the sync_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-read",
+          "markdownDescription": "Enables the sync_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-read",
+          "markdownDescription": "Denies the sync_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_remove_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-remove-dir",
+          "markdownDescription": "Enables the sync_remove_dir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_remove_dir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-remove-dir",
+          "markdownDescription": "Denies the sync_remove_dir command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-stat",
+          "markdownDescription": "Enables the sync_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-stat",
+          "markdownDescription": "Denies the sync_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-write",
+          "markdownDescription": "Enables the sync_write command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-write",
+          "markdownDescription": "Denies the sync_write command without any pre-configured scope."
+        },
+        {
           "description": "Enables the tailscale_status command without any pre-configured scope.",
           "type": "string",
           "const": "allow-tailscale-status",
@@ -415,10 +487,10 @@
           "markdownDescription": "Denies the uri_display_name command without any pre-configured scope."
         },
         {
-          "description": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`",
+          "description": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos, sincronizar el progreso de lectura y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`\n- `allow-sync-read`\n- `allow-sync-write`\n- `allow-sync-stat`\n- `allow-sync-list`\n- `allow-sync-mkdir`\n- `allow-sync-remove-dir`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`"
+          "markdownDescription": "Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos, sincronizar el progreso de lectura y abrir Tailscale.\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-list`\n- `allow-download`\n- `allow-upload`\n- `allow-mkdir`\n- `allow-remove`\n- `allow-disconnect`\n- `allow-tailscale-status`\n- `allow-open-tailscale`\n- `allow-uri-display-name`\n- `allow-sync-read`\n- `allow-sync-write`\n- `allow-sync-stat`\n- `allow-sync-list`\n- `allow-sync-mkdir`\n- `allow-sync-remove-dir`"
         }
       ]
     }

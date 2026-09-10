@@ -27,6 +27,7 @@ import {
   ReadSettings,
   ReadwiseSettings,
   SystemSettings,
+  SmbSyncSettings,
   WebDAVSettings,
   GoogleDriveSettings,
   S3Settings,
@@ -123,6 +124,26 @@ export const DEFAULT_NOTION_SETTINGS = {
   lastSyncedAt: 0,
   includeChapterHeading: true,
 } as NotionSettings;
+
+/**
+ * La sincronización por el NAS viene activada de fábrica: en esta app el NAS es
+ * el sitio de donde salen los libros, así que no tiene sentido pedirle a la
+ * usuaria que active nada. Mientras no haya conexión SMB el proveedor responde
+ * NETWORK y el motor simplemente lo reintenta más tarde.
+ *
+ * `syncBooks` sí queda en false: subir los libros al NAS no hace falta (ya están
+ * allí) y duplicarlos dentro de `.readest` solo gastaría espacio.
+ */
+export const DEFAULT_SMB_SYNC_SETTINGS = {
+  enabled: true,
+  rootPath: '/',
+  syncProgress: true,
+  syncNotes: true,
+  syncBooks: false,
+  strategy: 'silent',
+  deviceId: '',
+  lastSyncedAt: 0,
+} as SmbSyncSettings;
 
 export const DEFAULT_WEBDAV_SETTINGS = {
   enabled: false,
@@ -246,6 +267,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   hardcover: DEFAULT_HARDCOVER_SETTINGS,
   notion: DEFAULT_NOTION_SETTINGS,
   webdav: DEFAULT_WEBDAV_SETTINGS,
+  smb: DEFAULT_SMB_SYNC_SETTINGS,
   googleDrive: DEFAULT_GOOGLE_DRIVE_SETTINGS,
   s3: DEFAULT_S3_SETTINGS,
   onedrive: DEFAULT_ONEDRIVE_SETTINGS,

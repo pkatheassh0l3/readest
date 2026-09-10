@@ -11,18 +11,20 @@
  * keychain token, so it needs no settings to construct.
  */
 import type { FileSyncProvider } from './provider';
-import type { S3Settings, WebDAVSettings } from '@/types/settings';
+import type { S3Settings, SmbSyncSettings, WebDAVSettings } from '@/types/settings';
 import { createWebDAVProvider } from '@/services/sync/providers/webdav/WebDAVProvider';
 import { buildGoogleDriveProvider } from '@/services/sync/providers/gdrive/buildGoogleDriveProvider';
 import { buildOneDriveProvider } from '@/services/sync/providers/onedrive/buildOneDriveProvider';
 import { buildICloudProvider } from '@/services/sync/providers/icloud/buildICloudProvider';
 import { createS3Provider } from '@/services/sync/providers/s3/S3Provider';
+import { createSmbProvider } from '@/services/sync/providers/smb/SmbProvider';
 
-export type FileSyncBackendKind = 'webdav' | 'gdrive' | 's3' | 'onedrive' | 'icloud';
+export type FileSyncBackendKind = 'webdav' | 'gdrive' | 's3' | 'onedrive' | 'icloud' | 'smb';
 
 /** Minimal settings the registry reads to pick + build backends. */
 export interface FileSyncBackendsSettings {
   webdav?: WebDAVSettings;
+  smb?: SmbSyncSettings;
   googleDrive?: { enabled?: boolean };
   s3?: S3Settings;
   onedrive?: { enabled?: boolean };
@@ -59,6 +61,7 @@ const providerCacheKey = (
     const c = settings.s3;
     return `s3:${c?.enabled}:${c?.endpoint}:${c?.region}:${c?.bucket}:${c?.accessKeyId}:${c?.secretAccessKey}`;
   }
+  if (kind === 'smb') return `smb:${settings.smb?.enabled}:${settings.smb?.rootPath}`;
   if (kind === 'onedrive') return 'onedrive';
   if (kind === 'icloud') return 'icloud';
   return 'gdrive';
@@ -81,19 +84,23 @@ export const createFileSyncProvider = async (
   const cached = providerCache.get(kind);
   if (cached?.key === key) return cached.provider;
   const provider =
-    kind === 'webdav'
-      ? settings.webdav
-        ? createWebDAVProvider(settings.webdav)
-        : null
-      : kind === 's3'
-        ? settings.s3
-          ? createS3Provider(settings.s3)
+    kind === 'smb'
+      ? // No necesita credenciales: usa la sesión SMB que ya tiene abierta el
+        // explorador del NAS.
+        createSmbProvider({ rootPath: settings.smb?.rootPath })
+      : kind === 'webdav'
+        ? settings.webdav
+          ? createWebDAVProvider(settings.webdav)
           : null
-        : kind === 'onedrive'
-          ? await buildOneDriveProvider()
-          : kind === 'icloud'
-            ? await buildICloudProvider()
-            : await buildGoogleDriveProvider();
+        : kind === 's3'
+          ? settings.s3
+            ? createS3Provider(settings.s3)
+            : null
+          : kind === 'onedrive'
+            ? await buildOneDriveProvider()
+            : kind === 'icloud'
+              ? await buildICloudProvider()
+              : await buildGoogleDriveProvider();
   if (provider) providerCache.set(kind, { key, provider });
   return provider;
 };

@@ -1,6 +1,6 @@
 ## Default Permission
 
-Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos y abrir Tailscale.
+Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de ella, subir archivos, sincronizar el progreso de lectura y abrir Tailscale.
 
 #### This default permission set includes the following:
 
@@ -14,6 +14,12 @@ Permite navegar por una carpeta compartida del NAS por SMB, traerse libros de el
 - `allow-tailscale-status`
 - `allow-open-tailscale`
 - `allow-uri-display-name`
+- `allow-sync-read`
+- `allow-sync-write`
+- `allow-sync-stat`
+- `allow-sync-list`
+- `allow-sync-mkdir`
+- `allow-sync-remove-dir`
 
 ## Permission Table
 
@@ -202,6 +208,162 @@ Enables the remove command without any pre-configured scope.
 <td>
 
 Denies the remove command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-list`
+
+</td>
+<td>
+
+Enables the sync_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-list`
+
+</td>
+<td>
+
+Denies the sync_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-mkdir`
+
+</td>
+<td>
+
+Enables the sync_mkdir command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-mkdir`
+
+</td>
+<td>
+
+Denies the sync_mkdir command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-read`
+
+</td>
+<td>
+
+Enables the sync_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-read`
+
+</td>
+<td>
+
+Denies the sync_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-remove-dir`
+
+</td>
+<td>
+
+Enables the sync_remove_dir command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-remove-dir`
+
+</td>
+<td>
+
+Denies the sync_remove_dir command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-stat`
+
+</td>
+<td>
+
+Enables the sync_stat command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-stat`
+
+</td>
+<td>
+
+Denies the sync_stat command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:allow-sync-write`
+
+</td>
+<td>
+
+Enables the sync_write command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`nas-smb:deny-sync-write`
+
+</td>
+<td>
+
+Denies the sync_write command without any pre-configured scope.
 
 </td>
 </tr>

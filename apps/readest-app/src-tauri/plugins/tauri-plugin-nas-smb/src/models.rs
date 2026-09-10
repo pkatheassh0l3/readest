@@ -131,3 +131,78 @@ pub struct UriArgs {
 pub struct UriNameResponse {
     pub name: String,
 }
+
+// ---------------------------------------------------------------------------
+// Comandos de sincronización
+//
+// Readest ya trae un motor de sincronización por archivos con proveedores
+// intercambiables (WebDAV, S3, Drive...). Para enchufarle el NAS hace falta un
+// puñado de operaciones que el explorador no necesitaba: leer y escribir
+// archivos pequeños en memoria, y saber si algo existe.
+//
+// A diferencia de los comandos del explorador, estos NO rechazan la promesa:
+// devuelven un sobre con un `code` normalizado, porque el motor de Readest
+// distingue entre "no existe", "credenciales mal" y "no llego" para decidir si
+// aborta la pasada o sigue. Un mensaje de error en prosa no da para eso.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncPathArgs {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncReadArgs {
+    pub path: String,
+    /// Con `true` el contenido vuelve en base64; con `false`, como texto UTF-8.
+    pub binary: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncWriteArgs {
+    pub path: String,
+    /// Texto UTF-8, o base64 si `binary` es true.
+    pub content: String,
+    pub binary: bool,
+}
+
+/// `code` es uno de AUTH_FAILED, NOT_FOUND, NETWORK, CONFLICT o UNKNOWN, los
+/// mismos que usa `FileSyncError` en el frontend.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncReadResponse {
+    pub ok: bool,
+    pub code: Option<String>,
+    pub message: Option<String>,
+    pub content: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncStatResponse {
+    pub ok: bool,
+    pub code: Option<String>,
+    pub message: Option<String>,
+    pub size: f64,
+    pub is_directory: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncListResponse {
+    pub ok: bool,
+    pub code: Option<String>,
+    pub message: Option<String>,
+    pub entries: Vec<SmbEntry>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSimpleResponse {
+    pub ok: bool,
+    pub code: Option<String>,
+    pub message: Option<String>,
+}

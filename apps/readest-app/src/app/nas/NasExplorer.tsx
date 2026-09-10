@@ -12,6 +12,7 @@ import {
   MdInsertDriveFile,
   MdMenuBook,
   MdRefresh,
+  MdSync,
   MdUpload,
 } from 'react-icons/md';
 import { useEnv } from '@/context/EnvContext';
@@ -19,6 +20,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLibrary } from '@/hooks/useLibrary';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
+import { runFileLibrarySyncPass } from '@/services/sync/file/runLibrarySync';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useDeviceControlStore } from '@/store/deviceStore';
 import { isTauriAppPlatform } from '@/services/environment';
@@ -91,6 +93,7 @@ const NasExplorer: React.FC = () => {
   const router = useRouter();
   const { envConfig, appService } = useEnv();
   const { user } = useAuth();
+  const { settings, setSettings } = useSettingsStore();
   /**
    * Arranque de la app: su propio hook carga ajustes y biblioteca en los stores
    * y avisa cuando está listo.
@@ -128,6 +131,37 @@ const NasExplorer: React.FC = () => {
   const [entries, setEntries] = useState<SmbEntry[]>([]);
   const [listing, setListing] = useState(false);
   const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  /**
+   * Sincronización de la lectura por el propio NAS.
+   *
+   * Va contra una carpeta oculta `.readest` del share (ver
+   * `services/sync/providers/smb/SmbProvider.ts`), con el mismo motor que usa
+   * Readest para WebDAV o Drive: así viajan el punto de lectura, los marcadores
+   * y las notas entre dispositivos sin pasar por ninguna nube.
+   */
+  const syncEnabled = settings.smb?.enabled ?? true;
+
+  const setSyncEnabled = async (enabled: boolean) => {
+    const current = useSettingsStore.getState().settings;
+    const next = { ...current, smb: { ...current.smb, enabled } };
+    setSettings(next);
+    const service = appService ?? (await envConfig.getAppService());
+    await service?.saveSettings(next);
+  };
+
+  const syncNow = useCallback(async () => {
+    if (!(useSettingsStore.getState().settings.smb?.enabled ?? true)) return;
+    setSyncing(true);
+    try {
+      await runFileLibrarySyncPass(envConfig, _);
+    } catch (e) {
+      console.warn('[nas] sincronización falló', e);
+    } finally {
+      setSyncing(false);
+    }
+  }, [envConfig, _]);
 
   /**
    * Credenciales del último intento (con éxito o sin él): sirven para
@@ -180,6 +214,9 @@ const NasExplorer: React.FC = () => {
           }
           await setLastUsed(credentials);
           await loadFolder('');
+          // Recién conectadas, es el momento de traer por dónde iba la lectura
+          // en el otro dispositivo: hasta ahora el NAS no era alcanzable.
+          void syncNow();
         } else {
           setStatus('failed');
           // En el intento automático no gritamos el error: se deja la pantalla
@@ -196,7 +233,7 @@ const NasExplorer: React.FC = () => {
         setAutoConnecting(false);
       }
     },
-    [loadFolder],
+    [loadFolder, syncNow],
   );
 
   // Al abrir la app: perfiles guardados y conexión al último usado.
@@ -723,6 +760,26 @@ const NasExplorer: React.FC = () => {
           );
         })}
       </ul>
+
+      <div className='flex items-center gap-2 border-t border-base-300 p-2 text-sm'>
+        <label className='flex flex-1 items-center gap-2'>
+          <input
+            type='checkbox'
+            className='toggle toggle-sm eink-bordered'
+            checked={syncEnabled}
+            onChange={(e) => void setSyncEnabled(e.target.checked)}
+          />
+          <span>{_('Sincronizar la lectura por el NAS')}</span>
+        </label>
+        <button
+          className='btn btn-ghost btn-sm'
+          disabled={!syncEnabled || syncing}
+          aria-label={_('Sincronizar ahora')}
+          onClick={() => void syncNow()}
+        >
+          {syncing ? <span className='loading loading-spinner loading-xs' /> : <MdSync />}
+        </button>
+      </div>
 
       <div className='border-t border-base-300 p-2'>
         <button

@@ -81,4 +81,40 @@ impl<R: Runtime> NasSmb<R> {
             .run_mobile_plugin("uri_display_name", payload)
             .map_err(Into::into)
     }
+
+    pub fn sync_read(&self, payload: SyncReadArgs) -> crate::Result<SyncReadResponse> {
+        self.0
+            .run_mobile_plugin("sync_read", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn sync_write(&self, payload: SyncWriteArgs) -> crate::Result<SyncSimpleResponse> {
+        self.0
+            .run_mobile_plugin("sync_write", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn sync_stat(&self, payload: SyncPathArgs) -> crate::Result<SyncStatResponse> {
+        self.0
+            .run_mobile_plugin("sync_stat", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn sync_list(&self, payload: SyncPathArgs) -> crate::Result<SyncListResponse> {
+        self.0
+            .run_mobile_plugin("sync_list", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn sync_mkdir(&self, payload: SyncPathArgs) -> crate::Result<SyncSimpleResponse> {
+        self.0
+            .run_mobile_plugin("sync_mkdir", payload)
+            .map_err(Into::into)
+    }
+
+    pub fn sync_remove_dir(&self, payload: SyncPathArgs) -> crate::Result<SyncSimpleResponse> {
+        self.0
+            .run_mobile_plugin("sync_remove_dir", payload)
+            .map_err(Into::into)
+    }
 }

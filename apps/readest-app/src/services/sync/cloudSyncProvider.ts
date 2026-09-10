@@ -20,7 +20,7 @@ export type CloudSyncProviderKind = 'readest' | FileSyncBackendKind;
 /** Settings slice key for a third-party backend kind. */
 export const settingsKeyForBackend = (
   kind: FileSyncBackendKind,
-): 'webdav' | 'googleDrive' | 's3' | 'onedrive' | 'icloud' =>
+): 'webdav' | 'googleDrive' | 's3' | 'onedrive' | 'icloud' | 'smb' =>
   kind === 'gdrive' ? 'googleDrive' : kind;
 
 /** Human-readable provider name (product names — deliberately untranslated). */
@@ -35,7 +35,9 @@ export const cloudProviderDisplayName = (kind: CloudSyncProviderKind): string =>
           ? 'OneDrive'
           : kind === 'icloud'
             ? 'iCloud'
-            : 'Readest Cloud';
+            : kind === 'smb'
+              ? 'NAS (SMB)'
+              : 'Readest Cloud';
 
 /**
  * The third-party backends the user has switched on, in a STABLE order that
@@ -45,6 +47,7 @@ export const getEnabledFileSyncBackends = (
   settings: SystemSettings | null | undefined,
 ): FileSyncBackendKind[] => {
   const enabled: FileSyncBackendKind[] = [];
+  if (settings?.smb?.enabled) enabled.push('smb');
   if (settings?.webdav?.enabled) enabled.push('webdav');
   if (settings?.googleDrive?.enabled) enabled.push('gdrive');
   if (settings?.s3?.enabled) enabled.push('s3');
@@ -53,9 +56,16 @@ export const getEnabledFileSyncBackends = (
   return enabled;
 };
 
-/** Any third-party file-sync backend switched on. */
+/**
+ * Any third-party file-sync backend switched on.
+ *
+ * El NAS no cuenta aquí, y es deliberado: esta función es la que decide si
+ * "la usuaria eligió otro proveedor" y por tanto apaga Readest Cloud para la
+ * biblioteca. El NAS viene activado de fábrica, no es una elección, así que
+ * contarlo apagaría Readest Cloud a todo el mundo sin que nadie lo pidiera.
+ */
 export const hasAnyThirdPartyEnabled = (settings: SystemSettings | null | undefined): boolean =>
-  getEnabledFileSyncBackends(settings).length > 0;
+  getEnabledFileSyncBackends(settings).some(isMeteredBackend);
 
 /**
  * Whether Readest Cloud syncs the library channels on this device.
@@ -127,16 +137,26 @@ export interface CloudSyncGate {
   paused: boolean;
 }
 
+/**
+ * El NAS no pasa por el muro de pago de los backends de terceros: no hay ningún
+ * servicio de Readest de por medio (ni cuenta, ni almacenamiento suyo, ni
+ * tráfico), es la carpeta compartida de casa hablando por SMB en la red local o
+ * por Tailscale. Pausarla dejaría la app sin sincronización sin que exista nada
+ * que pausar.
+ */
+const isMeteredBackend = (kind: FileSyncBackendKind): boolean => kind !== 'smb';
+
 export const resolveCloudSyncGate = (
   settings: SystemSettings | null | undefined,
   plan: UserPlan = cachedUserPlan,
   customizationPurchased: boolean = cachedCustomizationPurchased,
 ): CloudSyncGate => {
   const backends = getEnabledFileSyncBackends(settings);
+  const metered = backends.filter(isMeteredBackend);
   return {
     readest: isReadestCloudEnabled(settings),
     backends,
-    paused: backends.length > 0 && !isCloudSyncAllowed(plan, customizationPurchased),
+    paused: metered.length > 0 && !isCloudSyncAllowed(plan, customizationPurchased),
   };
 };
 
@@ -146,7 +166,9 @@ export const getActiveFileSyncBackends = (
   plan?: UserPlan,
 ): FileSyncBackendKind[] => {
   const gate = resolveCloudSyncGate(settings, plan);
-  return gate.paused ? [] : gate.backends;
+  // Una cuenta pausada silencia los backends de pago, pero no el NAS (ver
+  // isMeteredBackend): no depende de ningún servicio que se pueda pausar.
+  return gate.paused ? gate.backends.filter((k) => !isMeteredBackend(k)) : gate.backends;
 };
 
 /**
@@ -165,6 +187,8 @@ export const applySyncBooksAutoEnable = (settings: SystemSettings): boolean => {
     // settings slice type intact; `settings[key] = { ...slice, syncBooks }`
     // does not typecheck when `key` is a union of literal keys.
     switch (kind) {
+      // 'smb' no aparece aquí a propósito: los libros ya viven en el NAS, y
+      // volver a subirlos dentro de `.readest` solo duplicaría el espacio.
       case 'webdav':
         if (settings.webdav && !settings.webdav.syncBooks) {
           settings.webdav = { ...settings.webdav, syncBooks: true };

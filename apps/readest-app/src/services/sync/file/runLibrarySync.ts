@@ -8,7 +8,7 @@ import type { UserPlan } from '@/types/quota';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useFileSyncStore } from '@/store/fileSyncStore';
-import { isWebAppPlatform } from '@/services/environment';
+import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 import { hasValidWebDriveToken } from '@/services/sync/providers/gdrive/auth/webTokenStore';
 import { isICloudSupportedPlatform } from '@/services/sync/providers/icloud/buildICloudProvider';
 import {
@@ -39,6 +39,9 @@ import { FileSyncEngine, type SyncLibraryResult } from '@/services/sync/file/eng
 export const canBackendRun = (kind: FileSyncBackendKind): boolean => {
   if (kind === 'gdrive' && isWebAppPlatform() && !hasValidWebDriveToken()) return false;
   if (kind === 'icloud' && !isICloudSupportedPlatform()) return false;
+  // El NAS habla por el plugin nativo `nas-smb`, que solo existe en la app
+  // (Android). En web no hay nada al otro lado del puente.
+  if (kind === 'smb' && !isTauriAppPlatform()) return false;
   return true;
 };
 

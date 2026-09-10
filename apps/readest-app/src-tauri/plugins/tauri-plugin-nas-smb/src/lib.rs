@@ -48,6 +48,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::tailscale_status,
             commands::open_tailscale,
             commands::uri_display_name,
+            commands::sync_read,
+            commands::sync_write,
+            commands::sync_stat,
+            commands::sync_list,
+            commands::sync_mkdir,
+            commands::sync_remove_dir,
         ])
         .setup(|app, api| {
             #[cfg(target_os = "android")]

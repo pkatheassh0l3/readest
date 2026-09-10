@@ -55,4 +55,28 @@ impl<R: Runtime> NasSmb<R> {
     pub fn uri_display_name(&self, _payload: UriArgs) -> crate::Result<UriNameResponse> {
         Err(crate::Error::UnsupportedPlatformError)
     }
+
+    pub fn sync_read(&self, _payload: SyncReadArgs) -> crate::Result<SyncReadResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn sync_write(&self, _payload: SyncWriteArgs) -> crate::Result<SyncSimpleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn sync_stat(&self, _payload: SyncPathArgs) -> crate::Result<SyncStatResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn sync_list(&self, _payload: SyncPathArgs) -> crate::Result<SyncListResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn sync_mkdir(&self, _payload: SyncPathArgs) -> crate::Result<SyncSimpleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn sync_remove_dir(&self, _payload: SyncPathArgs) -> crate::Result<SyncSimpleResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
 }

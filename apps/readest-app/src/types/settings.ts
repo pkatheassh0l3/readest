@@ -174,6 +174,29 @@ export interface NotionSettings {
  */
 export type WebDAVBrowseSortByType = 'name' | 'modified' | 'created' | 'size';
 
+/**
+ * Sincronización contra la carpeta compartida del NAS por SMB.
+ *
+ * Comparte motor, sub-interruptores y vocabulario de estrategia con
+ * {@link WebDAVSettings}, pero no lleva credenciales: la sesión SMB la abre el
+ * explorador del NAS (que guarda su perfil en el almacén seguro) y el proveedor
+ * la reutiliza. `rootPath` es la carpeta del share bajo la que vive todo; los
+ * datos van a una subcarpeta oculta `.readest` dentro de ella.
+ */
+export interface SmbSyncSettings {
+  enabled: boolean;
+  rootPath: string;
+  /** See {@link WebDAVSettings.providerSelectedAt}. */
+  providerSelectedAt?: number;
+  syncProgress?: boolean;
+  syncNotes?: boolean;
+  syncBooks?: boolean;
+  fullSync?: boolean;
+  strategy?: KOSyncStrategy;
+  deviceId?: string;
+  lastSyncedAt?: number;
+}
+
 export interface WebDAVSettings {
   enabled: boolean;
   serverUrl: string;
@@ -536,6 +559,8 @@ export interface SystemSettings {
   /** Optional by design — see {@link ReadestCloudSettings}. Never defaulted. */
   readestCloud?: ReadestCloudSettings;
   webdav: WebDAVSettings;
+  /** Sincronización por la carpeta compartida del NAS. Ver {@link SmbSyncSettings}. */
+  smb: SmbSyncSettings;
   googleDrive: GoogleDriveSettings;
   s3: S3Settings;
   onedrive: OneDriveSettings;

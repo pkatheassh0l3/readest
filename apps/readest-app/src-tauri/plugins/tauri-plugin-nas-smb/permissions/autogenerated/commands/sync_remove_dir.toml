@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-sync-remove-dir"
+description = "Enables the sync_remove_dir command without any pre-configured scope."
+commands.allow = ["sync_remove_dir"]
+
+[[permission]]
+identifier = "deny-sync-remove-dir"
+description = "Denies the sync_remove_dir command without any pre-configured scope."
+commands.deny = ["sync_remove_dir"]

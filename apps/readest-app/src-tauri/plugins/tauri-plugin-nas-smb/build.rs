@@ -11,6 +11,12 @@ const COMMANDS: &[&str] = &[
     "tailscale_status",
     "open_tailscale",
     "uri_display_name",
+    "sync_read",
+    "sync_write",
+    "sync_stat",
+    "sync_list",
+    "sync_mkdir",
+    "sync_remove_dir",
 ];
 
 fn main() {

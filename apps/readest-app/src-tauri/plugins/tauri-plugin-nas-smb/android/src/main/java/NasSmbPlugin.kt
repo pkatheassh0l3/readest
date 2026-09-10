@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Base64
 import android.util.Log
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -25,9 +26,11 @@ import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
 import org.json.JSONArray
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -74,6 +77,24 @@ class UriArgs {
 }
 
 @InvokeArg
+class SyncPathArgs {
+    var path: String = ""
+}
+
+@InvokeArg
+class SyncReadArgs {
+    var path: String = ""
+    var binary: Boolean = false
+}
+
+@InvokeArg
+class SyncWriteArgs {
+    var path: String = ""
+    var content: String = ""
+    var binary: Boolean = false
+}
+
+@InvokeArg
 class RemoveArgs {
     var path: String = ""
     var isDirectory: Boolean = false
@@ -98,6 +119,9 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
         private const val TAG = "NasSmbPlugin"
         private const val DEFAULT_PORT = 445
         private const val TAILSCALE_PACKAGE = "com.tailscale.ipn"
+
+        /** Tope para las lecturas en memoria de la sincronización (portadas, config.json). */
+        private const val MAX_SYNC_READ_BYTES = 16L * 1024 * 1024
     }
 
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "nas-smb") }
@@ -388,6 +412,266 @@ class NasSmbPlugin(private val activity: Activity) : Plugin(activity) {
                 }
             }
         return null
+    }
+
+    // -----------------------------------------------------------------------
+    // Comandos de sincronización
+    //
+    // Los usa el proveedor SMB del motor de sincronización de Readest. Se
+    // diferencian de los del explorador en dos cosas: leen y escriben archivos
+    // pequeños en memoria (config.json, portadas) en vez de contra disco, y
+    // nunca rechazan la promesa — devuelven `ok` más un `code` normalizado,
+    // porque el motor necesita distinguir "no existe" de "credenciales mal" y
+    // de "no llego al NAS" para decidir si aborta la pasada o sigue.
+    // -----------------------------------------------------------------------
+
+    @Command
+    fun sync_read(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncReadArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val path = normalizePath(args.path)
+                if (!share.fileExists(path)) {
+                    invoke.resolve(notFound())
+                    return@execute
+                }
+                val bytes = readAll(share, path)
+                val content =
+                    if (args.binary) Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    else String(bytes, Charsets.UTF_8)
+                invoke.resolve(JSObject().put("ok", true).put("content", content))
+            } catch (e: Exception) {
+                Log.w(TAG, "sync_read falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    @Command
+    fun sync_write(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncWriteArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val bytes =
+                    if (args.binary) Base64.decode(args.content, Base64.DEFAULT)
+                    else args.content.toByteArray(Charsets.UTF_8)
+                val remote = share.openFile(
+                    normalizePath(args.path),
+                    EnumSet.of(AccessMask.GENERIC_WRITE),
+                    EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+                    SMB2ShareAccess.ALL,
+                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                    EnumSet.noneOf(SMB2CreateOptions::class.java)
+                )
+                remote.use { f ->
+                    f.outputStream.use { output ->
+                        output.write(bytes)
+                        output.flush()
+                    }
+                }
+                invoke.resolve(JSObject().put("ok", true))
+            } catch (e: Exception) {
+                Log.w(TAG, "sync_write falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    @Command
+    fun sync_stat(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncPathArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val path = normalizePath(args.path)
+                // La raíz del share existe siempre y no se puede consultar como
+                // si fuera un archivo.
+                if (path.isEmpty()) {
+                    invoke.resolve(
+                        JSObject().put("ok", true).put("size", 0.0).put("isDirectory", true)
+                    )
+                    return@execute
+                }
+                if (share.folderExists(path)) {
+                    invoke.resolve(
+                        JSObject().put("ok", true).put("size", 0.0).put("isDirectory", true)
+                    )
+                    return@execute
+                }
+                if (!share.fileExists(path)) {
+                    invoke.resolve(notFound())
+                    return@execute
+                }
+                val info = share.getFileInformation(path)
+                invoke.resolve(
+                    JSObject()
+                        .put("ok", true)
+                        .put("size", info.standardInformation.endOfFile.toDouble())
+                        .put("isDirectory", false)
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "sync_stat falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    @Command
+    fun sync_list(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncPathArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val base = normalizePath(args.path)
+                if (base.isNotEmpty() && !share.folderExists(base)) {
+                    invoke.resolve(notFound())
+                    return@execute
+                }
+                invoke.resolve(JSObject().put("ok", true).put("entries", listEntries(share, base)))
+            } catch (e: Exception) {
+                Log.w(TAG, "sync_list falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    /** Idempotente: una carpeta que ya existe es un éxito, no un choque. */
+    @Command
+    fun sync_mkdir(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncPathArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val path = normalizePath(args.path)
+                if (path.isEmpty() || share.folderExists(path)) {
+                    invoke.resolve(JSObject().put("ok", true))
+                    return@execute
+                }
+                share.mkdir(path)
+                invoke.resolve(JSObject().put("ok", true))
+            } catch (e: Exception) {
+                // Otro dispositivo pudo crearla entre la comprobación y el mkdir.
+                val share2 = diskShare
+                if (share2 != null &&
+                    runCatching { share2.folderExists(normalizePath(args.path)) }.getOrDefault(false)
+                ) {
+                    invoke.resolve(JSObject().put("ok", true))
+                    return@execute
+                }
+                Log.w(TAG, "sync_mkdir falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    /** Borrar algo que no está también es un éxito (lo pide el motor). */
+    @Command
+    fun sync_remove_dir(invoke: Invoke) {
+        val args = invoke.parseArgs(SyncPathArgs::class.java)
+        io.execute {
+            val share = diskShare ?: return@execute invoke.resolve(noConnection())
+            try {
+                val path = normalizePath(args.path)
+                if (path.isEmpty() || !share.folderExists(path)) {
+                    invoke.resolve(JSObject().put("ok", true))
+                    return@execute
+                }
+                share.rmdir(path, true)
+                invoke.resolve(JSObject().put("ok", true))
+            } catch (e: Exception) {
+                Log.w(TAG, "sync_remove_dir falló", e)
+                invoke.resolve(failure(e))
+            }
+        }
+    }
+
+    private fun readAll(share: DiskShare, path: String): ByteArray {
+        val remote = share.openFile(
+            path,
+            EnumSet.of(AccessMask.GENERIC_READ),
+            EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+            EnumSet.of(SMB2ShareAccess.FILE_SHARE_READ),
+            SMB2CreateDisposition.FILE_OPEN,
+            EnumSet.noneOf(SMB2CreateOptions::class.java)
+        )
+        remote.use { f ->
+            f.inputStream.use { input ->
+                val out = ByteArrayOutputStream()
+                val buffer = ByteArray(64 * 1024)
+                var total = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    // Por aquí solo pasan config.json y portadas. Un archivo
+                    // enorme sería un error de uso, y cargarlo entero en memoria
+                    // tumbaría la app: mejor cortar con un mensaje claro.
+                    if (total > MAX_SYNC_READ_BYTES) {
+                        throw IOException("El archivo es demasiado grande para leerlo en memoria")
+                    }
+                    out.write(buffer, 0, read)
+                }
+                return out.toByteArray()
+            }
+        }
+    }
+
+    private fun listEntries(share: DiskShare, base: String): JSONArray {
+        val raw: List<FileIdBothDirectoryInformation> = share.list(base)
+        val array = JSONArray()
+        for (info in raw) {
+            if (info.fileName == "." || info.fileName == "..") continue
+            val isDir =
+                (info.fileAttributes and FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value) != 0L
+            val item = JSObject()
+            item.put("name", info.fileName)
+            item.put("path", if (base.isEmpty()) info.fileName else "$base/${info.fileName}")
+            item.put("isDirectory", isDir)
+            item.put("size", info.endOfFile.toDouble())
+            item.put(
+                "modified",
+                runCatching { info.lastWriteTime.toDate().time.toDouble() }.getOrDefault(0.0)
+            )
+            array.put(item)
+        }
+        return array
+    }
+
+    private fun noConnection(): JSObject =
+        JSObject().put("ok", false).put("code", "NETWORK")
+            .put("message", "No hay conexión activa con el NAS")
+
+    private fun notFound(): JSObject =
+        JSObject().put("ok", false).put("code", "NOT_FOUND")
+            .put("message", "No se encuentra esa carpeta o archivo en el NAS")
+
+    private fun failure(e: Exception): JSObject =
+        JSObject().put("ok", false).put("code", errorCode(e)).put("message", describeError(e))
+
+    /**
+     * Traduce el fallo al vocabulario que usa `FileSyncError` en el frontend.
+     * El motor de Readest se comporta distinto según el código: con AUTH_FAILED
+     * aborta la pasada entera, con NETWORK la reintenta más tarde, y NOT_FOUND
+     * suele ser simplemente "esto todavía no está subido".
+     */
+    private fun errorCode(e: Exception): String {
+        val upper = e.message.orEmpty().uppercase()
+        return when {
+            e is UnknownHostException || e is NoRouteToHostException ||
+                e is ConnectException || e is SocketTimeoutException -> "NETWORK"
+            "STATUS_LOGON_FAILURE" in upper || "STATUS_ACCESS_DENIED" in upper ||
+                "STATUS_USER_SESSION_DELETED" in upper ||
+                "STATUS_LOGON_TYPE_NOT_GRANTED" in upper -> "AUTH_FAILED"
+            "STATUS_OBJECT_NAME_NOT_FOUND" in upper ||
+                "STATUS_OBJECT_PATH_NOT_FOUND" in upper ||
+                "STATUS_BAD_NETWORK_NAME" in upper -> "NOT_FOUND"
+            "STATUS_OBJECT_NAME_COLLISION" in upper ||
+                "STATUS_SHARING_VIOLATION" in upper -> "CONFLICT"
+            e is IOException -> "NETWORK"
+            else -> "UNKNOWN"
+        }
     }
 
     @Command
